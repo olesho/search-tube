@@ -51,11 +51,11 @@ class Storage():
             print(f"Error in save_urls operation: {e}")
             raise
 
-    def retrieve_urls(self, downloaded=False):
+    def retrieve_url(self, downloaded=False):
         """Retrieves all URLs from the 'urls' table."""
         try:
             with self.connection:
-                cursor = self.connection.execute('SELECT youtube_id FROM urls WHERE downloaded = ?;', (downloaded,))
+                cursor = self.connection.execute('SELECT youtube_id FROM urls WHERE downloaded = ? LIMIT 1;', (downloaded,))
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
             print(f"Error retrieving URLs: {e}")
