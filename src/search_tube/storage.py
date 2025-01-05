@@ -80,8 +80,22 @@ class Storage():
             try:
                 with self.connection:
                     cursor = self.connection.cursor()
-                    cursor.execute('SELECT youtube_id FROM urls WHERE title IS NOT NULL AND keywords IS NOT NULL LIMIT 1;')
-                    return [row[0] for row in cursor.fetchall()]
+                    cursor.execute("""
+                        SELECT * FROM urls 
+                        WHERE title IS NOT NULL 
+                            AND keywords IS NOT NULL 
+                            AND rejected IS False 
+                            AND downloaded IS False
+                        LIMIT 1;""")
+                    row = cursor.fetchone()
+                    return {
+                        'id': row[0],
+                        'youtube_id': row[1],
+                        'title': row[2], 
+                        'keywords': row[3],
+                        'downloaded': row[4],
+                        'transcribed': row[5]
+                    }
             except Exception as e:
                 print(f"Error retrieving URLs: {e}")
                 raise
@@ -157,6 +171,28 @@ class Storage():
                     cursor.execute(
                         'UPDATE urls SET transcribed = true WHERE youtube_id = ?;',
                         (youtube_id,)
+                    )
+            except Exception as e:
+                print(f"Error updating downloaded status for {youtube_id}: {e}")
+                raise    
+
+    def make_url_rejected(self, youtube_id, reason: str):
+        """Updates the rejected status to True for a given YouTube ID.
+        
+        Args:
+            youtube_id (str): The YouTube video ID to update
+            reason (str): Reason for rejection
+            
+        Raises:
+            Exception: If there's an error updating the database
+        """
+        with self.lock:
+            try:
+                with self.connection:
+                    cursor = self.connection.cursor()
+                    cursor.execute(
+                        'UPDATE urls SET rejected = true, reject_reason = ? WHERE youtube_id = ?;',
+                        (reason, youtube_id, )
                     )
             except Exception as e:
                 print(f"Error updating downloaded status for {youtube_id}: {e}")

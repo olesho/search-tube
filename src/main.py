@@ -10,7 +10,7 @@ app = Flask(__name__)
 # Enable CORS for all routes
 CORS(app)
 
-engine = Engine(SEARCH_TUBE_DB_NAME, DOWNLOADED_STREAMS_DIR, TRANSCRIBES_DIR)
+engine = Engine(SEARCH_TUBE_DB_NAME, DOWNLOADED_STREAMS_DIR, TRANSCRIBES_DIR, do_download=True)
 
 @app.route('/', methods=['POST'])
 def receive_urls():

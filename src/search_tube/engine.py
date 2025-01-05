@@ -5,6 +5,7 @@ import threading
 from pytubefix import YouTube
 import whisper
 from .storage import Storage
+import json
 
 class MetadataFetcher:
     YOUTUBE_PREFIX = 'https://www.youtube.com/watch?v='
@@ -79,19 +80,13 @@ class MetadataFetcher:
 
 class YouTubeDownloader:
     YOUTUBE_PREFIX = 'https://www.youtube.com/watch?v='
-    FILTER_KEYWORDS = [
-        'chill beats', 'chill beats records', 'chill', 'beats', 'study beats',
-        'lofi', 'lo-fi beats', 'lo-fi', 'lofihiphop', 'chillhop', 'mellowbeats',
-        'chillbeats', 'lofibeats', 'chill beats music', 'lofihophop',
-        'instrumental', 'studybeats', 'crazzyjazz', 'Hippie', 'Sabotage', 'Hippie Sabotage', 'billie eilish',
-        "Lofi Sleep Chill & Study", "Lofi Hip-Hop Beats", "LO-FI Beats", "LoFi Study Vibes", "Jazz Cafe LoFi",
-        "tik tok", "tik tok song"
-    ]
+    FILTER_KEYWORDS = []
+    with open('./filter_keywords.txt') as f:
+        FILTER_KEYWORDS = f.read().splitlines()
 
-    def __init__(self, storage: Storage, downloads_dir: Path, do_download: bool = False) -> None:
+    def __init__(self, storage: Storage, downloads_dir: Path) -> None:
         self.storage = storage
         self.downloads_dir = Path(downloads_dir)
-        self.do_download = do_download
         self.download_timeout = 40
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.download_thread: Optional[threading.Thread] = None
@@ -123,12 +118,19 @@ class YouTubeDownloader:
 
     async def download_next(self) -> None:
         """Download the next available video"""
-        youtube_ids = self.storage.retrieve_url_to_download()
-        if not youtube_ids:
+        youtube_vid = self.storage.retrieve_url_to_download()
+        if not youtube_vid:
             return
-
-        youtube_id = youtube_ids[0]
-        url = f"{self.YOUTUBE_PREFIX}{youtube_id}"
+        vid_keywords = json.loads(youtube_vid['keywords'])
+        if any(keyword in self.FILTER_KEYWORDS for keyword in vid_keywords):
+            await asyncio.to_thread(
+                self.storage.make_url_rejected,
+                youtube_vid['youtube_id'],
+                "FILTERED_OUT"
+            )
+            return
+        
+        url = f"{self.YOUTUBE_PREFIX}{youtube_vid['youtube_id']}"
 
         try:
             yt = await asyncio.to_thread(
@@ -136,20 +138,11 @@ class YouTubeDownloader:
                 url,
                 on_complete_callback=self._completed_callback
             )
-
-            if not self.do_download:
-                return
-
-            # Get keywords from storage instead of fetching again
-            keywords = self.storage.get_video_keywords(youtube_id)
-            if any(keyword in self.FILTER_KEYWORDS for keyword in keywords):
-                return
-
             stream = await asyncio.to_thread(
                 lambda: yt.streams.get_audio_only()
             )
 
-            filename = f"{youtube_id}.mp4"
+            filename = f"{youtube_vid['youtube_id']}.mp4"
             await asyncio.to_thread(
                 stream.download,
                 output_path=str(self.downloads_dir),
@@ -158,7 +151,7 @@ class YouTubeDownloader:
             print(f"{yt.title} downloaded")
 
         except Exception as e:
-            print(f"Error downloading video {youtube_id}: {e}")
+            print(f"Error downloading video {youtube_vid['youtube_id']}: {e}")
 
     def _completed_callback(self, stream, file_path: str) -> None:
         """Handle successful download completion"""
@@ -253,8 +246,9 @@ class Engine:
     def __init__(self, db_name: str, downloads_dir: Path, transcribes_dir: Path, do_download: bool = False) -> None:
         self.storage = Storage(db_name)
         self.metadata_fetcher = MetadataFetcher(self.storage)
-        self.downloader = YouTubeDownloader(self.storage, downloads_dir, do_download)
-        self.transcriber = Transcriber(self.storage, downloads_dir, transcribes_dir)
+        if do_download:
+            self.downloader = YouTubeDownloader(self.storage, downloads_dir)
+            self.transcriber = Transcriber(self.storage, downloads_dir, transcribes_dir)
 
     def load_urls(self, urls: List[str]) -> None:
         """Filter and save valid YouTube URLs"""
