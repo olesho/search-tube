@@ -1,9 +1,15 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from search_tube.engine import Engine
 
-app = Flask(__name__)
+SEARCH_TUBE_DB_NAME = "search_tube.db"
+DOWNLOADED_STREAMS_DIR = "./downloaded_streams"
 
-engine = Engine()
+app = Flask(__name__)
+# Enable CORS for all routes
+CORS(app)
+
+engine = Engine(SEARCH_TUBE_DB_NAME, DOWNLOADED_STREAMS_DIR)
 
 @app.route('/', methods=['POST'])
 def receive_urls():
