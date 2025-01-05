@@ -1,5 +1,6 @@
 import re
 import sqlite3
+import json
 
 # remove_time_parameter removes time from Youtube URL
 def remove_time_parameter(url):
@@ -9,9 +10,12 @@ CREATE_URLS_SCHEMA = """
     CREATE TABLE IF NOT EXISTS urls (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         youtube_id TEXT NOT NULL UNIQUE,
-        title TEXT,
-        downloaded BOOL NOT NULL,
-        transcribed BOOL NOT NULL
+        title TEXT DEFAULT NULL,
+        keywords JSON DEFAULT NULL,
+        downloaded BOOL NOT NULL DEFAULT False,
+        transcribed BOOL NOT NULL DEFAULT False,
+        rejected BOOL DEFAULT False,
+        reject_reason TEXT DEFAULT NULL
     );"""
 
 class Storage():
@@ -51,17 +55,17 @@ class Storage():
             print(f"Error in save_urls operation: {e}")
             raise
 
-    def retrieve_url(self, downloaded=False):
+    def retrieve_url(self, downloaded=False, transcribed=False):
         """Retrieves all URLs from the 'urls' table."""
         try:
             with self.connection:
-                cursor = self.connection.execute('SELECT youtube_id FROM urls WHERE downloaded = ? LIMIT 1;', (downloaded,))
+                cursor = self.connection.execute('SELECT youtube_id FROM urls WHERE downloaded = ? AND transcribed = ? LIMIT 1;', (downloaded, transcribed,))
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
             print(f"Error retrieving URLs: {e}")
             raise
 
-    def save_title(self, youtube_id, title):
+    def save_metadata(self, youtube_id, title, keywords):
         """Updates the title for a given YouTube ID.
         
         Args:
@@ -74,8 +78,8 @@ class Storage():
         try:
             with self.connection:
                 self.connection.execute(
-                    'UPDATE urls SET title = ? WHERE youtube_id = ?;',
-                    (title, youtube_id)
+                    'UPDATE urls SET title = ?, keywords = ? WHERE youtube_id = ?;',
+                    (title, json.dumps(keywords), youtube_id)
                 )
         except Exception as e:
             print(f"Error updating title for {youtube_id}: {e}")
@@ -99,6 +103,25 @@ class Storage():
         except Exception as e:
             print(f"Error updating downloaded status for {youtube_id}: {e}")
             raise
+
+    def make_url_transcribed(self, youtube_id):
+        """Updates the transcribed status to True for a given YouTube ID.
+        
+        Args:
+            youtube_id (str): The YouTube video ID to update
+            
+        Raises:
+            Exception: If there's an error updating the database
+        """
+        try:
+            with self.connection:
+                self.connection.execute(
+                    'UPDATE urls SET transcribed = true WHERE youtube_id = ?;',
+                    (youtube_id,)
+                )
+        except Exception as e:
+            print(f"Error updating downloaded status for {youtube_id}: {e}")
+            raise    
 
 if __name__ == "__main__":
     # Example: testing functionality
