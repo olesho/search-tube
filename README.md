@@ -1,4 +1,6 @@
 # search-tube
+A research project fot transcribing YouTube videos history.
+
 
 ## Running the server
 
