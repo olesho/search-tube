@@ -1,5 +1,5 @@
 # search-tube
-A research project fot transcribing YouTube videos history.
+A research project to transcribe YouTube videos history.
 
 
 ## Running the server
@@ -17,7 +17,7 @@ docker run -p 5000:5000 search-tube
 ```
 
 ## Fetching Youtube History URLs
-To retrieve URL history open browser console at https://www.youtube.com/feed/history and copy/pasete following code:
+To retrieve URL history open browser console at https://www.youtube.com/feed/history and copy/paste following code:
 
 ```javascript
 (async () => {
